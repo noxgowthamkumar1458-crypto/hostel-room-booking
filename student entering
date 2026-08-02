@@ -1,0 +1,75 @@
+<?php
+include 'config.php';
+requireLogin();
+
+if ($_SESSION['role'] === 'admin') {
+    header("Location: admin_dashboard.php");
+    exit();
+}
+
+$student_id = $_SESSION['user_id'];
+
+// Fetch this student's bookings
+$stmt = $conn->prepare("
+    SELECT b.id, b.booking_date, b.check_in_date, b.status, r.room_number, r.room_type, r.price_per_month
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    WHERE b.student_id = ?
+    ORDER BY b.created_at DESC
+");
+$stmt->bind_param("i", $student_id);
+$stmt->execute();
+$bookings = $stmt->get_result();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Dashboard - Hostel Booking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <h2>Hostel Room Booking</h2>
+        <div>
+            <span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span>
+            <a href="logout.php" class="btn-logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="action-bar">
+            <a href="book_room.php" class="btn">+ Book a New Room</a>
+        </div>
+
+        <h3>My Bookings</h3>
+
+        <?php if ($bookings->num_rows === 0): ?>
+            <p>You have no bookings yet.</p>
+        <?php else: ?>
+        <table>
+            <tr>
+                <th>Room No.</th>
+                <th>Type</th>
+                <th>Price/Month</th>
+                <th>Booking Date</th>
+                <th>Status</th>
+            </tr>
+            <?php while ($row = $bookings->fetch_assoc()): ?>
+            <tr>
+                <td><?php echo htmlspecialchars($row['room_number']); ?></td>
+                <td><?php echo htmlspecialchars($row['room_type']); ?></td>
+                <td>₹<?php echo number_format($row['price_per_month'], 2); ?></td>
+                <td><?php echo htmlspecialchars($row['booking_date']); ?></td>
+                <td>
+                    <span class="status status-<?php echo strtolower($row['status']); ?>">
+                        <?php echo htmlspecialchars($row['status']); ?>
+                    </span>
+                </td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
