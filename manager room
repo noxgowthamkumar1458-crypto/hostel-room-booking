@@ -1,0 +1,121 @@
+<?php
+include 'config.php';
+requireLogin();
+requireAdmin();
+
+$error = '';
+$success = '';
+
+// Add new room
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_room'])) {
+    $room_number = trim($_POST['room_number']);
+    $room_type = $_POST['room_type'];
+    $capacity = $_POST['capacity'];
+    $price = $_POST['price'];
+    $description = trim($_POST['description']);
+
+    $stmt = $conn->prepare("INSERT INTO rooms (room_number, room_type, capacity, price_per_month, description) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssids", $room_number, $room_type, $capacity, $price, $description);
+
+    if ($stmt->execute()) {
+        $success = "Room added successfully.";
+    } else {
+        $error = "Room number may already exist.";
+    }
+    $stmt->close();
+}
+
+// Delete room
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+    $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: manage_rooms.php");
+    exit();
+}
+
+// Toggle status
+if (isset($_GET['toggle'])) {
+    $id = $_GET['toggle'];
+    $room = $conn->query("SELECT status FROM rooms WHERE id = $id")->fetch_assoc();
+    $newStatus = ($room['status'] === 'Available') ? 'Full' : 'Available';
+    $stmt = $conn->prepare("UPDATE rooms SET status = ? WHERE id = ?");
+    $stmt->bind_param("si", $newStatus, $id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: manage_rooms.php");
+    exit();
+}
+
+$rooms = $conn->query("SELECT * FROM rooms ORDER BY room_number");
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Rooms - Hostel Booking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <h2>Hostel Room Booking - Admin</h2>
+        <div>
+            <span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span>
+            <a href="logout.php" class="btn-logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="admin_dashboard.php">&larr; Back to Dashboard</a>
+        <h3>Add New Room</h3>
+
+        <?php if ($error): ?><p class="error"><?php echo htmlspecialchars($error); ?></p><?php endif; ?>
+        <?php if ($success): ?><p class="success"><?php echo htmlspecialchars($success); ?></p><?php endif; ?>
+
+        <form method="POST" action="manage_rooms.php" class="inline-form">
+            <input type="text" name="room_number" placeholder="Room No. (e.g. D401)" required>
+            <select name="room_type" required>
+                <option value="Single">Single</option>
+                <option value="Double">Double</option>
+                <option value="Triple">Triple</option>
+                <option value="Dormitory">Dormitory</option>
+            </select>
+            <input type="number" name="capacity" placeholder="Capacity" min="1" required>
+            <input type="number" name="price" placeholder="Price/Month" step="0.01" required>
+            <input type="text" name="description" placeholder="Description">
+            <button type="submit" name="add_room" class="btn">Add Room</button>
+        </form>
+
+        <h3>All Rooms</h3>
+        <table>
+            <tr>
+                <th>Room No.</th>
+                <th>Type</th>
+                <th>Capacity</th>
+                <th>Price/Month</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            <?php while ($room = $rooms->fetch_assoc()): ?>
+            <tr>
+                <td><?php echo htmlspecialchars($room['room_number']); ?></td>
+                <td><?php echo htmlspecialchars($room['room_type']); ?></td>
+                <td><?php echo htmlspecialchars($room['capacity']); ?></td>
+                <td>₹<?php echo number_format($room['price_per_month'], 2); ?></td>
+                <td>
+                    <span class="status status-<?php echo strtolower($room['status']); ?>">
+                        <?php echo htmlspecialchars($room['status']); ?>
+                    </span>
+                </td>
+                <td>
+                    <a href="manage_rooms.php?toggle=<?php echo $room['id']; ?>">Toggle Status</a> |
+                    <a href="manage_rooms.php?delete=<?php echo $room['id']; ?>" onclick="return confirm('Delete this room?');">Delete</a>
+                </td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+    </div>
+</body>
+</html>
