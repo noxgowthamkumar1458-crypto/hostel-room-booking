@@ -1,0 +1,84 @@
+<?php
+include 'config.php';
+
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
+    $password = $_POST['password'];
+    $confirm = $_POST['confirm_password'];
+
+    if ($password !== $confirm) {
+        $error = "Passwords do not match.";
+    } else {
+        // Check if email already exists
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->store_result();
+
+        if ($stmt->num_rows > 0) {
+            $error = "Email already registered.";
+        } else {
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $stmt2 = $conn->prepare("INSERT INTO users (name, email, password, phone, role) VALUES (?, ?, ?, ?, 'student')");
+            $stmt2->bind_param("ssss", $name, $email, $hashedPassword, $phone);
+
+            if ($stmt2->execute()) {
+                $success = "Registration successful! You can now login.";
+            } else {
+                $error = "Something went wrong. Please try again.";
+            }
+            $stmt2->close();
+        }
+        $stmt->close();
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hostel Booking - Register</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <h2>Hostel Room Booking</h2>
+        <h3>Student Registration</h3>
+
+        <?php if ($error): ?>
+            <p class="error"><?php echo htmlspecialchars($error); ?></p>
+        <?php endif; ?>
+        <?php if ($success): ?>
+            <p class="success"><?php echo htmlspecialchars($success); ?> <a href="index.php">Login now</a></p>
+        <?php endif; ?>
+
+        <?php if (!$success): ?>
+        <form method="POST" action="register.php">
+            <label>Full Name</label>
+            <input type="text" name="name" required>
+
+            <label>Email</label>
+            <input type="email" name="email" required>
+
+            <label>Phone</label>
+            <input type="text" name="phone" required>
+
+            <label>Password</label>
+            <input type="password" name="password" required minlength="6">
+
+            <label>Confirm Password</label>
+            <input type="password" name="confirm_password" required minlength="6">
+
+            <button type="submit">Register</button>
+        </form>
+        <?php endif; ?>
+
+        <p>Already have an account? <a href="index.php">Login here</a></p>
+    </div>
+</body>
+</html>
