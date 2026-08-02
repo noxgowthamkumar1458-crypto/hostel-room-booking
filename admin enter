@@ -1,0 +1,54 @@
+<?php
+include 'config.php';
+requireLogin();
+requireAdmin();
+
+// Quick stats
+$totalRooms = $conn->query("SELECT COUNT(*) AS cnt FROM rooms")->fetch_assoc()['cnt'];
+$availableRooms = $conn->query("SELECT COUNT(*) AS cnt FROM rooms WHERE status = 'Available'")->fetch_assoc()['cnt'];
+$totalStudents = $conn->query("SELECT COUNT(*) AS cnt FROM users WHERE role = 'student'")->fetch_assoc()['cnt'];
+$pendingBookings = $conn->query("SELECT COUNT(*) AS cnt FROM bookings WHERE status = 'Pending'")->fetch_assoc()['cnt'];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Hostel Booking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <h2>Hostel Room Booking - Admin</h2>
+        <div>
+            <span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span>
+            <a href="logout.php" class="btn-logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3><?php echo $totalRooms; ?></h3>
+                <p>Total Rooms</p>
+            </div>
+            <div class="stat-card">
+                <h3><?php echo $availableRooms; ?></h3>
+                <p>Available Rooms</p>
+            </div>
+            <div class="stat-card">
+                <h3><?php echo $totalStudents; ?></h3>
+                <p>Registered Students</p>
+            </div>
+            <div class="stat-card">
+                <h3><?php echo $pendingBookings; ?></h3>
+                <p>Pending Bookings</p>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <a href="manage_rooms.php" class="btn">Manage Rooms</a>
+            <a href="manage_bookings.php" class="btn">Manage Bookings</a>
+        </div>
+    </div>
+</body>
+</html>
