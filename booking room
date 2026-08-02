@@ -1,0 +1,92 @@
+<?php
+include 'config.php';
+requireLogin();
+
+if ($_SESSION['role'] === 'admin') {
+    header("Location: admin_dashboard.php");
+    exit();
+}
+
+$student_id = $_SESSION['user_id'];
+$error = '';
+$success = '';
+
+// Handle booking submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $room_id = $_POST['room_id'];
+    $check_in_date = $_POST['check_in_date'];
+    $booking_date = date('Y-m-d');
+
+    // Check room is still available
+    $check = $conn->prepare("SELECT status FROM rooms WHERE id = ?");
+    $check->bind_param("i", $room_id);
+    $check->execute();
+    $roomResult = $check->get_result()->fetch_assoc();
+
+    if (!$roomResult || $roomResult['status'] !== 'Available') {
+        $error = "Sorry, this room is no longer available.";
+    } else {
+        $stmt = $conn->prepare("INSERT INTO bookings (student_id, room_id, booking_date, check_in_date, status) VALUES (?, ?, ?, ?, 'Pending')");
+        $stmt->bind_param("iiss", $student_id, $room_id, $booking_date, $check_in_date);
+
+        if ($stmt->execute()) {
+            $success = "Room booking request submitted! Await admin approval.";
+        } else {
+            $error = "Booking failed. Please try again.";
+        }
+        $stmt->close();
+    }
+    $check->close();
+}
+
+// Fetch available rooms
+$rooms = $conn->query("SELECT * FROM rooms WHERE status = 'Available' ORDER BY room_number");
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Book a Room - Hostel Booking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <h2>Hostel Room Booking</h2>
+        <div>
+            <span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span>
+            <a href="logout.php" class="btn-logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="student_dashboard.php">&larr; Back to Dashboard</a>
+        <h3>Available Rooms</h3>
+
+        <?php if ($error): ?><p class="error"><?php echo htmlspecialchars($error); ?></p><?php endif; ?>
+        <?php if ($success): ?><p class="success"><?php echo htmlspecialchars($success); ?></p><?php endif; ?>
+
+        <?php if ($rooms->num_rows === 0): ?>
+            <p>No rooms currently available.</p>
+        <?php else: ?>
+        <div class="room-grid">
+            <?php while ($room = $rooms->fetch_assoc()): ?>
+            <div class="room-card">
+                <h4>Room <?php echo htmlspecialchars($room['room_number']); ?></h4>
+                <p><strong>Type:</strong> <?php echo htmlspecialchars($room['room_type']); ?></p>
+                <p><strong>Capacity:</strong> <?php echo htmlspecialchars($room['capacity']); ?></p>
+                <p><strong>Price:</strong> ₹<?php echo number_format($room['price_per_month'], 2); ?>/month</p>
+                <p><?php echo htmlspecialchars($room['description']); ?></p>
+
+                <form method="POST" action="book_room.php">
+                    <input type="hidden" name="room_id" value="<?php echo $room['id']; ?>">
+                    <label>Check-in Date</label>
+                    <input type="date" name="check_in_date" min="<?php echo date('Y-m-d'); ?>" required>
+                    <button type="submit" class="btn">Book This Room</button>
+                </form>
+            </div>
+            <?php endwhile; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
