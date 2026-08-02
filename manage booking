@@ -1,0 +1,100 @@
+<?php
+include 'config.php';
+requireLogin();
+requireAdmin();
+
+// Approve or reject booking
+if (isset($_GET['action']) && isset($_GET['id'])) {
+    $id = $_GET['id'];
+    $action = $_GET['action'];
+
+    if ($action === 'approve') {
+        // Get room_id for this booking
+        $booking = $conn->query("SELECT room_id FROM bookings WHERE id = $id")->fetch_assoc();
+
+        $stmt = $conn->prepare("UPDATE bookings SET status = 'Approved' WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $stmt->close();
+
+        // Mark room as Full
+        $stmt2 = $conn->prepare("UPDATE rooms SET status = 'Full' WHERE id = ?");
+        $stmt2->bind_param("i", $booking['room_id']);
+        $stmt2->execute();
+        $stmt2->close();
+
+    } elseif ($action === 'reject') {
+        $stmt = $conn->prepare("UPDATE bookings SET status = 'Rejected' WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    header("Location: manage_bookings.php");
+    exit();
+}
+
+$bookings = $conn->query("
+    SELECT b.id, b.booking_date, b.check_in_date, b.status,
+           u.name AS student_name, u.email, u.phone,
+           r.room_number, r.room_type
+    FROM bookings b
+    JOIN users u ON b.student_id = u.id
+    JOIN rooms r ON b.room_id = r.id
+    ORDER BY b.created_at DESC
+");
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Bookings - Hostel Booking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <h2>Hostel Room Booking - Admin</h2>
+        <div>
+            <span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span>
+            <a href="logout.php" class="btn-logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="admin_dashboard.php">&larr; Back to Dashboard</a>
+        <h3>All Bookings</h3>
+
+        <table>
+            <tr>
+                <th>Student</th>
+                <th>Contact</th>
+                <th>Room</th>
+                <th>Check-in</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            <?php while ($row = $bookings->fetch_assoc()): ?>
+            <tr>
+                <td><?php echo htmlspecialchars($row['student_name']); ?></td>
+                <td><?php echo htmlspecialchars($row['email']); ?><br><?php echo htmlspecialchars($row['phone']); ?></td>
+                <td><?php echo htmlspecialchars($row['room_number']); ?> (<?php echo htmlspecialchars($row['room_type']); ?>)</td>
+                <td><?php echo htmlspecialchars($row['check_in_date']); ?></td>
+                <td>
+                    <span class="status status-<?php echo strtolower($row['status']); ?>">
+                        <?php echo htmlspecialchars($row['status']); ?>
+                    </span>
+                </td>
+                <td>
+                    <?php if ($row['status'] === 'Pending'): ?>
+                        <a href="manage_bookings.php?action=approve&id=<?php echo $row['id']; ?>">Approve</a> |
+                        <a href="manage_bookings.php?action=reject&id=<?php echo $row['id']; ?>">Reject</a>
+                    <?php else: ?>
+                        —
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+    </div>
+</body>
+</html>
